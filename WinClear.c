@@ -64,18 +64,28 @@ static BOOLEAN parse_acpi_sdt_entry(UINT64 address)
 	PrintDebug(L"Found BGRT address: 0x%X%X\n\n", address>>32, address);
 
 	ACPI_BGRT * acpi_bgrt = (ACPI_BGRT *)address;
-	if (acpi_bgrt->Header.Length != sizeof(ACPI_BGRT) || acpi_bgrt->Header.Revision != 1 || acpi_bgrt->Version != 1 || acpi_bgrt->ImageType != 0 || !acpi_bgrt->ImageAddress)
+	if (acpi_bgrt->Header.Length != sizeof(ACPI_BGRT) ||
+		(acpi_bgrt->Header.Revision != 1 && acpi_bgrt->Header.Revision != 2) ||
+		acpi_bgrt->Version != 1 || acpi_bgrt->ImageType != 0 || !acpi_bgrt->ImageAddress)
 	{
 		Print(L"Invalid or unsupported BGRT or boot image type\n");
+		PrintDebug(L"BGRT.Length = %d [should be %d]\n", acpi_bgrt->Header.Length, sizeof(ACPI_BGRT));
+		PrintDebug(L"BGRT.Revision = %d [should be 1 or 2]\n", acpi_bgrt->Header.Revision);
+		PrintDebug(L"BGRT.Version = %d [should be 1]\n", acpi_bgrt->Version);
+		PrintDebug(L"BGRT.ImageType = %d [should be 1 (bitmap)]\n", acpi_bgrt->ImageType);
+		PrintDebug(L"BGRT.ImageAddress = %d [should not be zero]\n", acpi_bgrt->ImageAddress);
+
 		return FALSE;
 	}
 
-	PrintDebug(L"Found boot logo bitmap address: 0x%X%X\n", acpi_bgrt->ImageAddress>>32, acpi_bgrt->ImageAddress);
+	PrintDebug(L"Found boot logo bitmap address: 0x%X%X\n",
+		acpi_bgrt->ImageAddress>>32, acpi_bgrt->ImageAddress);
 
 	BMP_HEADER * bmp_header = (BMP_HEADER *)acpi_bgrt->ImageAddress;
 	if (CompareMem(bmp_header->Signature, "BM", 2))
 	{
 		Print(L"Invalid bitmap header signature: %.2a\n", bmp_header->Signature);
+		PrintDebug(L"BMP_Header.Signature = %.2a [should be BM]\n", bmp_header->Signature);
 		return FALSE;
 	}
 
@@ -98,7 +108,9 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
 
 	for (UINTN i = 0; i < ConfigurationTableSz; i++)
 	{
-		EFI_GUID efi_acpi_table_guid = {0x8868e871,0xe4f1,0x11d3, {0xbc,0x22,0x00,0x80,0xc7,0x3c,0x88,0x81}};
+		EFI_GUID efi_acpi_table_guid = {0x8868e871,0xe4f1,0x11d3,
+			{0xbc,0x22,0x00,0x80,0xc7,0x3c,0x88,0x81}};
+
 		if (CompareGuid(&efi_acpi_table_guid, &ConfigurationTable[i].VendorGuid) == 0)
 		{
 			PrintDebug(L"Found ACPI table address: 0x%X\n\n", ConfigurationTable[i].VendorTable);
@@ -151,12 +163,14 @@ EFI_STATUS EFIAPI efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
 	EFI_FILE_HANDLE WindowsImageFile;
 	EFI_HANDLE WindowsImage;
 
-	Ret = uefi_call_wrapper(BS->OpenProtocol, 6, ImageHandle, &LoadedImageProtocol, (VOID **)&LoadedImage, ImageHandle, NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+	Ret = uefi_call_wrapper(BS->OpenProtocol, 6, ImageHandle, &LoadedImageProtocol,
+		(VOID **)&LoadedImage, ImageHandle, NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
 	ExitOnError(EFI_ERROR(Ret), (L"Error opening LoadedImageProtocol: %r\n"), Ret);
 
 	Root = LibOpenRoot(LoadedImage->DeviceHandle);
 	ExitOnError(!Root, L"Error opening ESP root directory: %r\n", EFI_LOAD_ERROR);
-	Ret = uefi_call_wrapper(Root->Open, 5, Root, &WindowsImageFile, L"\\EFI\\Microsoft\\Boot\\bootmgfw.efi", EFI_FILE_MODE_READ, 0);
+	Ret = uefi_call_wrapper(Root->Open, 5, Root, &WindowsImageFile,
+		L"\\EFI\\Microsoft\\Boot\\bootmgfw.efi", EFI_FILE_MODE_READ, 0);
 	ExitOnError(EFI_ERROR(Ret), L"Could not open ESP:\\EFI\\Microsoft\\Boot\\bootmgfw.efi: %r\n", Ret);
 	uefi_call_wrapper(WindowsImageFile->Close, 1, WindowsImageFile);
 	uefi_call_wrapper(Root->Close, 1, Root);
