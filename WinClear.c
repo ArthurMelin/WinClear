@@ -72,8 +72,8 @@ static BOOLEAN parse_acpi_sdt_entry(UINT64 address)
 		PrintDebug(L"BGRT.Length = %d [should be %d]\n", acpi_bgrt->Header.Length, sizeof(ACPI_BGRT));
 		PrintDebug(L"BGRT.Revision = %d [should be 1 or 2]\n", acpi_bgrt->Header.Revision);
 		PrintDebug(L"BGRT.Version = %d [should be 1]\n", acpi_bgrt->Version);
-		PrintDebug(L"BGRT.ImageType = %d [should be 1 (bitmap)]\n", acpi_bgrt->ImageType);
-		PrintDebug(L"BGRT.ImageAddress = %d [should not be zero]\n", acpi_bgrt->ImageAddress);
+		PrintDebug(L"BGRT.ImageType = %d [should be 0 (bitmap)]\n", acpi_bgrt->ImageType);
+		PrintDebug(L"BGRT.ImageAddress = %X%X [should not be zero]\n", acpi_bgrt->ImageAddress>>32, address);
 
 		return FALSE;
 	}
