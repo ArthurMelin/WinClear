@@ -45,7 +45,7 @@ disk.hdd: WinClear.efi
 	mkfs.fat -F16 fat.img
 	mount fat.img tmp
 	-mkdir -p tmp/EFI/BOOT
-	cp WinClear.efi tmp/EFI/BOOT/BOOTx64.efi &
+	cp WinClear.efi tmp/EFI/BOOT/BOOTx64.efi
 	sleep 0.1
 	umount tmp
 	mkgpt -o disk.hdd --part fat.img --type system
