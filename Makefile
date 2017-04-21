@@ -1,52 +1,90 @@
-CFLAGS=-c -fno-stack-protector -fPIC -fshort-wchar -mno-red-zone -I /usr/include/efi -I /usr/include/efi/x86_64 -DEFI_FUNCTION_WRAPPER
-LDFLAGS=-nostdlib -znocombreloc -T /usr/lib64/elf_x86_64_efi.lds -shared -Bsymbolic -L /usr/lib64 -l:libgnuefi.a -l:libefi.a
-OBJCFLAGS=-j .text -j sdata -j .data -j .dynamic -j .dynsym -j .rel -j .rela -j .reloc --target=efi-app-x86_64
+##
+## Makefile for WinClear in /home/arthur.melin/Code/WinClear
+##
+## Made by Arthur Melin
+##
+## Started on  Fri Apr 21 12:07:15 2017 Arthur Melin
+## Last update Fri Apr 21 17:01:16 2017 Arthur Melin
+##
 
-C=WinClear.c
-O=$(C:.c=.o)
+################
+# Configuration:
+ARCH		=	x86_64
+BOOT_PATH	=	"L\"\\\\EFI\\\\Microsoft\\\\Boot\\\\bootmgfw.efi\""
+################
 
-all: EFI
+NAME		=	WinClear-$(ARCH).efi
+NAMESO		=	WinClear-$(ARCH).so
 
-debug: debugEFI
-
-install: installEFI
-
-clean: cleanEFI
-
-
-
-EFI: $(C) WinClear.efi
-
-debugEFI: CFLAGS += -D_DEBUG
-debugEFI: disk.hdd
-
-installEFI: WinClear.efi
-	-mkdir -p /boot/EFI/WinClear
-	cp WinClear.efi /boot/EFI/WinClear/WinClear.efi
-	@echo "Please replace the Windows Boot Manager path in your bootloader with EFI\\WinClear\\WinClear.efi"
-
-cleanEFI:	
-	-umount tmp
-	-rm -r *.o *.so *.efi *.img *.hdd tmp
+SRCS		=	WinClear.c
+INCS		=	WinClear.h
+OBJS		=	$(SRCS:.c=.o)
 
 
+SRCSDIR		=	src
+INCSDIR		=	include
+OBJSDIR		=	obj
 
-.c.o:
-	gcc $< $(CFLAGS) -o $(@)
+EFI_INCSDIRS	=	/usr/include/efi	\
+			/usr/include/efi/$(ARCH)
+EFI_LIBSDIRS	=	/usr/lib
+EFI_LIBS	=	-lgnuefi -lefi
+EFI_OBJS	=	/usr/lib/crt0-efi-$(ARCH).o
 
-WinClear.efi: $(O)	
-	ld $(O) /usr/lib64/crt0-efi-x86_64.o $(LDFLAGS) -o WinClear.so
-	objcopy $(OBJCFLAGS) WinClear.so $(@)
+CC		=	gcc
+LD		=	ld
+OBJCP		=	objcopy
 
-.PHONY: disk.hdd
-disk.hdd: WinClear.efi
-	-mkdir tmp
-	dd if=/dev/zero of=fat.img bs=1M count=10
-	mkfs.fat -F16 fat.img
-	mount fat.img tmp
-	-mkdir -p tmp/EFI/BOOT
-	cp WinClear.efi tmp/EFI/BOOT/BOOTx64.efi
-	sleep 0.1
-	umount tmp
-	mkgpt -o disk.hdd --part fat.img --type system
-	chmod 776 disk.hdd
+CFLAGS		=	-c -W -Wall -Wextra				\
+			$(addprefix -I,$(INCSDIR) $(EFI_INCSDIRS))	\
+			-DEFI_FUNCTION_WRAPPER				\
+			-DBOOT_PATH=$(BOOT_PATH)			\
+			-ffreestanding					\
+			-fno-stack-protector				\
+			-fpic						\
+			-fshort-wchar					\
+			-mno-red-zone
+LDFLAGS		=	-shared				\
+			$(addprefix -L,$(EFI_LIBSDIRS))	\
+			-Telf_$(ARCH)_efi.lds		\
+			$(EFI_LIBS)			\
+			-Bsymbolic			\
+			-nostdlib			\
+			-zcombreloc
+OBJCPFLAGS	=	-j .text	\
+			-j .data	\
+			-j .sdata	\
+			-j .reloc	\
+			-j .rel		\
+			-j .rela	\
+			-j .dynamic	\
+			-j .dynsym	\
+			--target=efi-app-$(ARCH)
+
+RM		=	rm -rf
+MKDIR		=	mkdir
+
+all: $(NAME)
+
+$(NAME): $(NAMESO)
+	$(OBJCP) $(OBJCPFLAGS) $< $@
+
+$(NAMESO): $(addprefix $(OBJSDIR)/,$(OBJS)) $(EFI_OBJS)
+	$(LD) $^ $(LDFLAGS) -o $@
+
+$(OBJSDIR)/%.o: $(SRCSDIR)/%.c $(addprefix $(INCSDIR)/,$(INCS)) | $(OBJSDIR)
+	$(CC) $< $(CFLAGS) -o $@
+
+$(OBJSDIR):
+	$(MKDIR) $@
+
+clean:
+	$(RM) $(OBJSDIR)
+	$(RM) $(NAMESO)
+
+fclean: clean
+	$(RM) $(NAME)
+
+re: fclean all
+
+.PHONY: all clean fclean re
